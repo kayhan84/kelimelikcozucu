@@ -426,8 +426,8 @@
             <input id="imageInput" type="file" accept="image/*" />
           </div>
           <div style="flex:1 1 260px; min-width: 260px;">
-            <label class="small" for="wordFileInput">Wordlist TXT</label>
-            <input id="wordFileInput" type="file" accept=".txt" />
+            <label class="small" for="wordListArea">Wordlist TXT (repo içinden otomatik yüklenir)</label>
+            <div class="pill">Aynı klasördeki <span class="mono">wordlist.txt</span> dosyası açılışta otomatik alınır.</div>
           </div>
         </div>
 
@@ -438,7 +438,7 @@
           <button id="sampleBtn" class="warn">Örnek Tahta</button>
         </div>
 
-        <div id="statusBox" class="status">Hazır. Önce ekran görüntüsü ve wordlist yükle.</div>
+        <div id="statusBox" class="status">Hazır. Repo içindeki wordlist otomatik yükleniyor; ardından ekran görüntüsü seçebilirsin.</div>
 
         <div class="previewWrap" style="margin-top:14px;">
           <canvas id="previewCanvas"></canvas>
@@ -478,7 +478,7 @@
       <div class="card">
         <h2>2) Sözlük</h2>
         <label class="small" for="wordListArea">Wordlist</label>
-        <textarea id="wordListArea" placeholder="Wordlist yükle ya da buraya yapıştır."></textarea>
+        <textarea id="wordListArea" placeholder="Repo içindeki wordlist.txt otomatik yüklenecek. İstersen burayı elle de düzenleyebilirsin."></textarea>
         <div class="row" style="margin-top:10px;">
           <div class="pill">Yüklü kelime sayısı: <strong id="dictCount">0</strong></div>
           <div class="pill">ASCII wordlist desteği var</div>
@@ -956,6 +956,27 @@
     function updateDict() {
       dictionary = rebuildDictionaryIndex(parseWordList(wordListArea.value));
       dictCount.textContent = String(dictionary.length);
+    }
+
+    async function autoLoadWordListFromRepo(path = 'wordlist.txt') {
+      try {
+        setStatus('Repo içindeki wordlist yükleniyor...');
+        const response = await fetch(path, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        if (!text.trim()) throw new Error('Dosya boş');
+        wordListArea.value = text;
+        updateDict();
+        setStatus(`Repo wordlist yüklendi. ${dictionary.length} kelime kullanılacak.`, 'ok');
+        return true;
+      } catch (err) {
+        if (!wordListArea.value.trim()) {
+          wordListArea.value = DEFAULT_WORDLIST;
+        }
+        updateDict();
+        setStatus(`Repo içindeki wordlist.txt okunamadı (${err.message}). Yerleşik sözlükle devam ediliyor.`, 'error');
+        return false;
+      }
     }
 
     function renderBoard() {
@@ -3066,20 +3087,6 @@
       }
     });
 
-    wordFileInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        wordListArea.value = text;
-        if (!wordListArea.value.trim()) wordListArea.value = DEFAULT_WORDLIST;
-    updateDict();
-        setStatus(`Wordlist yüklendi. ${dictionary.length} kelime kullanılacak.`, 'ok');
-      } catch (err) {
-        setStatus('Wordlist okunamadı: ' + err.message, 'error');
-      }
-    });
-
     wordListArea.addEventListener('input', updateDict);
     rackInput.addEventListener('input', () => {
       const normalized = normalizeTR(rackInput.value).slice(0, 7);
@@ -3143,7 +3150,7 @@
     renderBoard();
     renderLetterButtons();
     drawPreview();
-    updateDict();
+    autoLoadWordListFromRepo();
   </script>
 </body>
 </html>
